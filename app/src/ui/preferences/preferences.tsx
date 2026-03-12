@@ -42,6 +42,7 @@ import { Prompts } from './prompts'
 import { Repository } from '../../models/repository'
 import { Notifications } from './notifications'
 import { Accessibility } from './accessibility'
+import { Formatting } from './formatting'
 import {
   ICustomIntegration,
   TargetPathArgument,
@@ -57,6 +58,19 @@ import {
   setGitHookEnvShell,
   setHooksEnvEnabled,
 } from '../../lib/hooks/config'
+import {
+  DateFormat,
+  TimeFormat,
+  INumberFormat,
+  defaultDateFormat,
+  defaultTimeFormat,
+  numberFormatToKey,
+  numberFormatFromKey,
+} from '../../models/formatting-preferences'
+
+const dateFormatKey = 'dateFormat'
+const timeFormatKey = 'timeFormat'
+const numberFormatKey = 'numberFormat'
 
 interface IPreferencesProps {
   readonly dispatcher: Dispatcher
@@ -151,6 +165,10 @@ interface IPreferencesState {
   readonly selectedGitHookEnvShell: string | undefined
   // Whether the preferences related to Git hooks environment have been changed
   readonly hooksPreferencesDirty: boolean
+
+  readonly selectedDateFormat: DateFormat
+  readonly selectedTimeFormat: TimeFormat
+  readonly selectedNumberFormat: INumberFormat
 }
 
 /**
@@ -213,6 +231,13 @@ export class Preferences extends React.Component<
       cacheGitHookEnv: getCacheHooksEnv(),
       selectedGitHookEnvShell: getGitHookEnvShell(),
       hooksPreferencesDirty: false,
+      selectedDateFormat:
+        (localStorage.getItem(dateFormatKey) as DateFormat) ?? defaultDateFormat,
+      selectedTimeFormat:
+        (localStorage.getItem(timeFormatKey) as TimeFormat) ?? defaultTimeFormat,
+      selectedNumberFormat: numberFormatFromKey(
+        localStorage.getItem(numberFormatKey) ?? ''
+      ),
     }
   }
 
@@ -326,6 +351,10 @@ export class Preferences extends React.Component<
               <Octicon className="icon" symbol={octicons.paintbrush} />
               Appearance
             </span>
+            <span id={this.getTabId(PreferencesTab.Formatting)}>
+              <Octicon className="icon" symbol={octicons.number} />
+              Formatting
+            </span>
             <span id={this.getTabId(PreferencesTab.Notifications)}>
               <Octicon className="icon" symbol={octicons.bell} />
               Notifications
@@ -365,6 +394,9 @@ export class Preferences extends React.Component<
         break
       case PreferencesTab.Appearance:
         suffix = 'appearance'
+        break
+      case PreferencesTab.Formatting:
+        suffix = 'formatting'
         break
       case PreferencesTab.Notifications:
         suffix = 'notifications'
@@ -512,6 +544,18 @@ export class Preferences extends React.Component<
             onSelectedThemeChanged={this.onSelectedThemeChanged}
             selectedTabSize={this.props.selectedTabSize}
             onSelectedTabSizeChanged={this.onSelectedTabSizeChanged}
+          />
+        )
+        break
+      case PreferencesTab.Formatting:
+        View = (
+          <Formatting
+            selectedDateFormat={this.state.selectedDateFormat}
+            onSelectedDateFormatChanged={this.onSelectedDateFormatChanged}
+            selectedTimeFormat={this.state.selectedTimeFormat}
+            onSelectedTimeFormatChanged={this.onSelectedTimeFormatChanged}
+            selectedNumberFormat={this.state.selectedNumberFormat}
+            onSelectedNumberFormatChanged={this.onSelectedNumberFormatChanged}
           />
         )
         break
@@ -717,6 +761,20 @@ export class Preferences extends React.Component<
     this.setState({ selectedShell: shell })
   }
 
+  private onSelectedDateFormatChanged = (selectedDateFormat: DateFormat) => {
+    this.setState({ selectedDateFormat })
+  }
+
+  private onSelectedTimeFormatChanged = (selectedTimeFormat: TimeFormat) => {
+    this.setState({ selectedTimeFormat })
+  }
+
+  private onSelectedNumberFormatChanged = (
+    selectedNumberFormat: INumberFormat
+  ) => {
+    this.setState({ selectedNumberFormat })
+  }
+
   private onUseCustomEditorChanged = (useCustomEditor: boolean) => {
     this.setState({ useCustomEditor })
   }
@@ -908,6 +966,13 @@ export class Preferences extends React.Component<
     dispatcher.setUnderlineLinksSetting(this.state.underlineLinks)
 
     dispatcher.setDiffCheckMarksSetting(this.state.showDiffCheckMarks)
+
+    localStorage.setItem(dateFormatKey, this.state.selectedDateFormat)
+    localStorage.setItem(timeFormatKey, this.state.selectedTimeFormat)
+    localStorage.setItem(
+      numberFormatKey,
+      numberFormatToKey(this.state.selectedNumberFormat)
+    )
 
     this.props.onDismissed()
   }
