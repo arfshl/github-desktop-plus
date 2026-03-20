@@ -363,6 +363,50 @@ describe('formatCompactNumber', () => {
     })
   })
 
+  describe('explicit decimals', () => {
+    it('uses explicit decimals when provided', () => {
+      // By default, 12345 would show '12k' (0 decimals for >= 10)
+      // With explicit decimals: 2, it should show '12.35k'
+      assert.strictEqual(
+        formatCompactNumber(12345, { ...commaThousandsDotDecimal, decimals: 2 }),
+        '12.35k'
+      )
+    })
+
+    it('respects explicit decimals of 0', () => {
+      // By default, 1234 would show '1.2k' (1 decimal for < 10)
+      // With explicit decimals: 0, it should show '1k'
+      assert.strictEqual(
+        formatCompactNumber(1234, { ...commaThousandsDotDecimal, decimals: 0 }),
+        '1k'
+      )
+    })
+
+    it('works with explicit decimals across magnitude boundaries', () => {
+      assert.strictEqual(
+        formatCompactNumber(1234567, {
+          ...commaThousandsDotDecimal,
+          decimals: 3,
+        }),
+        '1.235m'
+      )
+      assert.strictEqual(
+        formatCompactNumber(1234567890, {
+          ...commaThousandsDotDecimal,
+          decimals: 2,
+        }),
+        '1.23b'
+      )
+    })
+
+    it('uses configured decimal separator with explicit decimals', () => {
+      assert.strictEqual(
+        formatCompactNumber(12345, { ...dotThousandsCommaDecimal, decimals: 2 }),
+        '12,35k'
+      )
+    })
+  })
+
   describe('all format configurations', () => {
     it('works with space thousands and dot decimal', () => {
       assert.strictEqual(
