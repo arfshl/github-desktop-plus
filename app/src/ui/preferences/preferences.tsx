@@ -70,6 +70,7 @@ import {
   setTimeFormatPreference,
   setNumberFormatPreference,
 } from '../../models/formatting-preferences'
+import { enableFormattingPreferences } from '../../lib/feature-flag'
 
 interface IPreferencesProps {
   readonly dispatcher: Dispatcher
@@ -957,10 +958,12 @@ export class Preferences extends React.Component<
 
     dispatcher.setDiffCheckMarksSetting(this.state.showDiffCheckMarks)
 
-    setDateFormatPreference(this.state.selectedDateFormat)
-    setTimeFormatPreference(this.state.selectedTimeFormat)
-    setNumberFormatPreference(this.state.selectedNumberFormat)
-    setPreferAbsoluteDates(this.state.preferAbsoluteDates)
+    if (enableFormattingPreferences()) {
+      setDateFormatPreference(this.state.selectedDateFormat)
+      setTimeFormatPreference(this.state.selectedTimeFormat)
+      setNumberFormatPreference(this.state.selectedNumberFormat)
+      setPreferAbsoluteDates(this.state.preferAbsoluteDates)
+    }
 
     this.props.onDismissed()
   }
