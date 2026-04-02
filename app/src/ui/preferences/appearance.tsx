@@ -99,15 +99,19 @@ export class Appearance extends React.Component<
   }
 
   private onDateFormatChanged = (event: React.FormEvent<HTMLSelectElement>) => {
-    this.props.onSelectedDateFormatChanged(
-      event.currentTarget.value as DateFormat
-    )
+    const value = event.currentTarget.value
+    const match = dateFormats.find(f => f === value)
+    if (match !== undefined) {
+      this.props.onSelectedDateFormatChanged(match)
+    }
   }
 
   private onTimeFormatChanged = (event: React.FormEvent<HTMLSelectElement>) => {
-    this.props.onSelectedTimeFormatChanged(
-      event.currentTarget.value as TimeFormat
-    )
+    const value = event.currentTarget.value
+    const match = timeFormats.find(f => f === value)
+    if (match !== undefined) {
+      this.props.onSelectedTimeFormatChanged(match)
+    }
   }
 
   private onNumberFormatChanged = (
