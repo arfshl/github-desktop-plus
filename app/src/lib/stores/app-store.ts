@@ -958,6 +958,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
     // updateStore is a global, App.tsx handles most of it but we carry the
     // UpdateState in the AppState so we need to emit whenever it updates.
     updateStore.onDidChange(() => this.emitUpdate())
+
+    this.copilotStore.onDidUpdate(() => {
+      this.copilotModels = this.copilotStore.isAvailable
+        ? this.copilotStore.cachedModelList ?? this.copilotModels
+        : null
+      this.emitUpdate()
+    })
   }
 
   /** Load the emoji from disk. */

@@ -129,6 +129,7 @@ export class CopilotStore {
 
   private cachedModels: ReadonlyArray<ModelInfo> | null = null
   private modelsCachedAt: number = 0
+  private modelsInFlight: Promise<ReadonlyArray<ModelInfo>> | null = null
 
   public constructor(private readonly accountsStore: AccountsStore) {
     this.accountsStore.onDidUpdate(this.onAccountsUpdated)
@@ -153,14 +154,22 @@ export class CopilotStore {
     if (dotComAccount?.login !== this.currentAccount?.login) {
       this.cachedModels = null
       this.modelsCachedAt = 0
+      this.modelsInFlight = null
     }
 
     this.currentAccount = dotComAccount
 
     if (dotComAccount === null) {
       log.debug('CopilotStore: No GitHub.com account available')
+      this.emitter.emit('did-update')
     } else {
       log.debug(`CopilotStore: Account updated for '${dotComAccount.login}'`)
+      // Proactively fetch models so they are ready when the user opens the
+      // Copilot tab in Settings, even if they signed in without reopening
+      // the dialog.
+      this.getCachedModels()
+        .then(() => this.emitter.emit('did-update'))
+        .catch(() => this.emitter.emit('did-update'))
     }
   }
 
@@ -292,6 +301,14 @@ export class CopilotStore {
   }
 
   /**
+   * Returns the last-fetched model list without triggering a refresh.
+   * Null if models have never been fetched.
+   */
+  public get cachedModelList(): ReadonlyArray<ModelInfo> | null {
+    return this.cachedModels
+  }
+
+  /**
    * Lists the available Copilot models from the SDK, using a cached result if
    * it is less than {@link ModelListCacheTTL} old.
    *
@@ -317,6 +334,20 @@ export class CopilotStore {
       return this.cachedModels
     }
 
+    // Deduplicate concurrent fetches — if one is already in flight, reuse it.
+    if (this.modelsInFlight !== null) {
+      return this.modelsInFlight
+    }
+
+    this.modelsInFlight = this.fetchModels()
+    try {
+      return await this.modelsInFlight
+    } finally {
+      this.modelsInFlight = null
+    }
+  }
+
+  private async fetchModels(): Promise<ReadonlyArray<ModelInfo>> {
     const client = await this.createClient()
 
     try {
@@ -331,6 +362,14 @@ export class CopilotStore {
     } finally {
       await this.stopClient(client)
     }
+  }
+
+  /**
+   * Register a function to be called when the store state changes
+   * (e.g. account change, model list refresh).
+   */
+  public onDidUpdate(fn: () => void): Disposable {
+    return this.emitter.on('did-update', fn)
   }
 
   /**
