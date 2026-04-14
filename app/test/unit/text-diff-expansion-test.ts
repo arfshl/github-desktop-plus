@@ -236,4 +236,30 @@ describe('text-diff-expansion', () => {
       }
     }
   })
+
+  it('creates a whole-file context diff when filters remove every hunk', () => {
+    const newContentLines = ['alpha', 'beta', 'gamma']
+    const textDiff: ITextDiff = {
+      kind: DiffType.Text,
+      text: '',
+      hunks: [],
+      maxLineNumber: 0,
+      hasHiddenBidiChars: false,
+    }
+
+    const expandedDiff = expandWholeTextDiff(textDiff, newContentLines)
+    assert(expandedDiff !== undefined)
+    assert.equal(expandedDiff.hunks.length, 1)
+    assert.equal(expandedDiff.maxLineNumber, 3)
+
+    const [wholeFileHunk] = expandedDiff.hunks
+    assert.equal(wholeFileHunk.header.oldStartLine, 1)
+    assert.equal(wholeFileHunk.header.oldLineCount, 3)
+    assert.equal(wholeFileHunk.header.newStartLine, 1)
+    assert.equal(wholeFileHunk.header.newLineCount, 3)
+    assert.equal(wholeFileHunk.lines.length, 4)
+    assert.equal(wholeFileHunk.lines[1].type, DiffLineType.Context)
+    assert.equal(wholeFileHunk.lines[1].content, 'alpha')
+    assert.equal(wholeFileHunk.lines[3].content, 'gamma')
+  })
 })

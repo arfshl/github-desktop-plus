@@ -127,6 +127,10 @@ export function expandWholeTextDiff(
   diff: ITextDiff,
   newContentLines: ReadonlyArray<string>
 ): ITextDiff | undefined {
+  if (diff.hunks.length === 0) {
+    return createWholeFileContextDiff(diff, newContentLines)
+  }
+
   let result = diff
 
   // The logic is to keep expanding the first hunk until it's the only one.
@@ -155,6 +159,51 @@ export function expandWholeTextDiff(
   }
 
   return result
+}
+
+function createWholeFileContextDiff(
+  diff: ITextDiff,
+  newContentLines: ReadonlyArray<string>
+): ITextDiff {
+  const lineCount = newContentLines.length
+  const header = new DiffHunkHeader(1, lineCount, 1, lineCount)
+  const headerLine = new DiffLine(
+    header.toDiffLineRepresentation(),
+    DiffLineType.Hunk,
+    null,
+    null,
+    null,
+    false
+  )
+  const contextLines = newContentLines.map(
+    (line, index) =>
+      new DiffLine(
+        ` ${line}`,
+        DiffLineType.Context,
+        null,
+        index + 1,
+        index + 1,
+        false
+      )
+  )
+  const lines = [headerLine, ...contextLines]
+  const hunk = new DiffHunk(
+    header,
+    lines,
+    0,
+    lines.length - 1,
+    DiffHunkExpansionType.None
+  )
+
+  return {
+    ...diff,
+    text: getDiffTextFromHunks([hunk]),
+    hunks: [hunk],
+    maxLineNumber: getLargestLineNumber([hunk]),
+    hasHiddenBidiChars:
+      diff.hasHiddenBidiChars ||
+      newContentLines.some(line => HiddenBidiCharsRegex.test(line)),
+  }
 }
 
 /**
