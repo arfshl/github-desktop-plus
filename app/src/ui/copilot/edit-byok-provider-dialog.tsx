@@ -184,7 +184,6 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
           {this.renderProviderSection()}
           {this.renderAuthenticationSection(isEditing)}
           {this.renderModelsSection()}
-          {this.renderAdvancedSection()}
         </DialogContent>
         <DialogFooter>
           <OkCancelButtonGroup okButtonText={isEditing ? 'Save' : 'Add'} />
@@ -223,7 +222,7 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
         />
         {this.state.type === 'openai' && (
           <Select
-            label={__DARWIN__ ? 'Wire API' : 'Wire API'}
+            label={__DARWIN__ ? 'API Format' : 'API format'}
             value={this.state.wireApi}
             onChange={this.onWireApiChanged}
           >
@@ -239,6 +238,16 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
             placeholder="2024-10-21"
           />
         )}
+        <TextBox
+          label={
+            __DARWIN__
+              ? 'Request Timeout (seconds)'
+              : 'Request timeout (seconds)'
+          }
+          value={this.state.requestTimeoutSeconds}
+          onValueChanged={this.onRequestTimeoutChanged}
+          placeholder="60"
+        />
       </fieldset>
     )
   }
@@ -302,28 +311,6 @@ export class EditCopilotBYOKProviderDialog extends React.Component<
           <Octicon symbol={octicons.plus} />
           {__DARWIN__ ? 'Add Model' : 'Add model'}
         </Button>
-      </fieldset>
-    )
-  }
-
-  private renderAdvancedSection() {
-    return (
-      <fieldset className="copilot-byok-fieldset">
-        <legend>Advanced</legend>
-        <TextBox
-          label={
-            __DARWIN__
-              ? 'Request Timeout (seconds)'
-              : 'Request timeout (seconds)'
-          }
-          value={this.state.requestTimeoutSeconds}
-          onValueChanged={this.onRequestTimeoutChanged}
-          placeholder="60"
-        />
-        <p className="copilot-byok-section-hint">
-          How long to wait for a response before giving up. Leave blank to use
-          the default.
-        </p>
       </fieldset>
     )
   }

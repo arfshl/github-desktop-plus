@@ -185,7 +185,6 @@ export class CopilotPreferences extends React.Component<ICopilotPreferencesProps
     const modelCount = provider.models.length
     const modelLabel = modelCount === 1 ? '1 model' : `${modelCount} models`
     const isLocal = provider.authKind === 'none'
-    const editLabel = __DARWIN__ ? 'Edit…' : 'Edit…'
     return (
       <li key={provider.id} className="copilot-byok-provider">
         <div className="copilot-byok-provider-info">
@@ -196,8 +195,7 @@ export class CopilotPreferences extends React.Component<ICopilotPreferencesProps
             )}
           </div>
           <span className="copilot-byok-provider-meta">
-            {this.formatProviderType(provider)} · {modelLabel} ·{' '}
-            {provider.baseUrl}
+            {this.formatProviderType(provider)} · {modelLabel}
           </span>
         </div>
         <div className="copilot-byok-provider-actions">
@@ -205,7 +203,7 @@ export class CopilotPreferences extends React.Component<ICopilotPreferencesProps
             onClick={this.onEditBYOKProviderClick(provider)}
             ariaLabel={`Edit ${provider.name}`}
           >
-            {editLabel}
+            <Octicon symbol={octicons.pencil} />
           </Button>
           <Button
             onClick={this.onDeleteBYOKProviderClick(provider)}
