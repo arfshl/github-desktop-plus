@@ -7,8 +7,25 @@ import {
   ICopilotConflictContext,
   IConflictCommitContext,
 } from '../../src/lib/copilot-conflict-context'
+import { Commit } from '../../src/models/commit'
+import { CommitIdentity } from '../../src/models/commit-identity'
 import { PullRequest, PullRequestRef } from '../../src/models/pull-request'
 import { gitHubRepoFixture } from '../helpers/github-repo-builder'
+
+function makeCommit(shortSha: string, summary: string): Commit {
+  const identity = new CommitIdentity('test', 'test@test.com', new Date())
+  return new Commit(
+    shortSha.padEnd(40, '0'),
+    shortSha,
+    summary,
+    '',
+    identity,
+    identity,
+    [],
+    [],
+    []
+  )
+}
 
 describe('copilot-conflict-context', () => {
   describe('extractConflictHunks', () => {
@@ -583,10 +600,10 @@ describe('copilot-conflict-context', () => {
     it('includes commit context in output', () => {
       const commitCtx: IConflictCommitContext = {
         ourCommits: [
-          { sha: 'abc1234', summary: 'Add numeric IDs' },
-          { sha: 'def5678', summary: 'Update schema' },
+          makeCommit('abc1234', 'Add numeric IDs'),
+          makeCommit('def5678', 'Update schema'),
         ],
-        theirCommits: [{ sha: '111aaaa', summary: 'Add UUID support' }],
+        theirCommits: [makeCommit('111aaaa', 'Add UUID support')],
       }
 
       const result = formatConflictContextForPrompt(
@@ -628,8 +645,8 @@ describe('copilot-conflict-context', () => {
 
     it('includes both commit and PR context in output', () => {
       const commitCtx: IConflictCommitContext = {
-        ourCommits: [{ sha: 'aaa1111', summary: 'Fix type error' }],
-        theirCommits: [{ sha: 'bbb2222', summary: 'Add UUIDs' }],
+        ourCommits: [makeCommit('aaa1111', 'Fix type error')],
+        theirCommits: [makeCommit('bbb2222', 'Add UUIDs')],
       }
       const pr = makePullRequest(50, 'UUID migration', 'Migrate IDs to UUIDs.')
 

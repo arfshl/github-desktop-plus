@@ -2,6 +2,7 @@ import { readFile, stat } from 'fs/promises'
 import { extname } from 'path'
 
 import { Repository } from '../models/repository'
+import { Commit } from '../models/commit'
 import { PullRequest } from '../models/pull-request'
 import { getMergeBase } from './git/merge'
 import { getCommits } from './git/log'
@@ -27,20 +28,6 @@ export interface IFileConflictContext {
   readonly path: string
   /** All conflict hunks in the file */
   readonly hunks: ReadonlyArray<IConflictHunk>
-}
-
-/** Commit context relevant to the merge conflict */
-export interface IConflictCommitContext {
-  /** Recent commits on our branch since the merge base */
-  readonly ourCommits: ReadonlyArray<{
-    readonly sha: string
-    readonly summary: string
-  }>
-  /** Recent commits on their branch since the merge base */
-  readonly theirCommits: ReadonlyArray<{
-    readonly sha: string
-    readonly summary: string
-  }>
 }
 
 /**
@@ -189,6 +176,12 @@ export function extractConflictHunks(
   return hunks
 }
 
+/** Commit context from both sides of a merge conflict */
+export interface IConflictCommitContext {
+  readonly ourCommits: ReadonlyArray<Commit>
+  readonly theirCommits: ReadonlyArray<Commit>
+}
+
 /**
  * Gather commit messages from both sides of the merge to provide intent
  * context for conflict resolution.
@@ -210,7 +203,7 @@ export async function gatherCommitContext(
       return null
     }
 
-    const [ourRawCommits, theirRawCommits] = await Promise.all([
+    const [ourCommits, theirCommits] = await Promise.all([
       getCommits(repository, `${mergeBase}..${ourBranch}`, limit, undefined, [
         '--first-parent',
       ]),
@@ -219,16 +212,7 @@ export async function gatherCommitContext(
       ]),
     ])
 
-    return {
-      ourCommits: ourRawCommits.map(c => ({
-        sha: c.shortSha,
-        summary: c.summary,
-      })),
-      theirCommits: theirRawCommits.map(c => ({
-        sha: c.shortSha,
-        summary: c.summary,
-      })),
-    }
+    return { ourCommits, theirCommits }
   } catch {
     return null
   }
@@ -351,7 +335,7 @@ export function formatConflictContextForPrompt(
     if (commitContext.ourCommits.length > 0) {
       parts.push(`### Ours (${context.ourLabel}) commits:`)
       for (const commit of commitContext.ourCommits) {
-        parts.push(`- ${commit.sha}: ${commit.summary}`)
+        parts.push(`- ${commit.shortSha}: ${commit.summary}`)
       }
       parts.push('')
     }
@@ -359,7 +343,7 @@ export function formatConflictContextForPrompt(
     if (commitContext.theirCommits.length > 0) {
       parts.push(`### Theirs (${context.theirLabel}) commits:`)
       for (const commit of commitContext.theirCommits) {
-        parts.push(`- ${commit.sha}: ${commit.summary}`)
+        parts.push(`- ${commit.shortSha}: ${commit.summary}`)
       }
       parts.push('')
     }
