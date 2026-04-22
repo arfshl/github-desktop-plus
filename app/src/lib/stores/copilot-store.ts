@@ -442,7 +442,7 @@ export class CopilotStore extends BaseStore {
 
       // Batch into chunks and resolve concurrently
       const chunkSize = getChunkSize(filesTotal)
-      const chunks = createChunks(resolvableFiles, chunkSize)
+      const chunks = createDependencyAwareChunks(resolvableFiles, chunkSize)
       const allResolutions: Array<IFileResolution> = []
       let filesResolved = 0
 
@@ -502,7 +502,7 @@ export class CopilotStore extends BaseStore {
       try {
         session = await client.createSession({
           model: 'gpt-5-mini',
-          reasoningEffort: 'medium',
+          reasoningEffort: 'high',
           availableTools: [],
           systemMessage: {
             mode: 'append',
@@ -513,7 +513,7 @@ export class CopilotStore extends BaseStore {
           }),
         })
 
-        const response = await session.sendAndWait({ prompt }, 60000)
+        const response = await session.sendAndWait({ prompt }, 600_000)
 
         if (!response || !response.data.content) {
           throw new Error('No response from Copilot')
@@ -637,13 +637,178 @@ export class CopilotStore extends BaseStore {
 }
 
 /** Split an array into chunks of the given size. */
-function createChunks<T>(
-  items: ReadonlyArray<T>,
-  size: number
-): ReadonlyArray<ReadonlyArray<T>> {
-  const chunks: Array<ReadonlyArray<T>> = []
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size))
+/**
+ * Extract exported and imported symbols from conflict hunk content for
+ * dependency detection. Scans all hunk sections (ours, theirs, context)
+ * to find import paths, exported names, and referenced identifiers.
+ */
+function extractSymbols(file: IFileConflictContext): {
+  readonly exports: ReadonlySet<string>
+  readonly importPaths: ReadonlySet<string>
+  readonly references: ReadonlySet<string>
+} {
+  const exports = new Set<string>()
+  const importPaths = new Set<string>()
+  const references = new Set<string>()
+
+  const textParts: Array<string> = []
+  for (const hunk of file.hunks) {
+    textParts.push(
+      hunk.oursContent,
+      hunk.theirsContent,
+      hunk.contextBefore,
+      hunk.contextAfter
+    )
+    if (hunk.baseContent !== null) {
+      textParts.push(hunk.baseContent)
+    }
   }
-  return chunks
+  const content = textParts.join('\n')
+
+  for (const m of content.matchAll(
+    /export\s+(?:function|const|let|class|interface|type|enum)\s+(\w+)/g
+  )) {
+    exports.add(m[1])
+  }
+
+  for (const m of content.matchAll(
+    /import\s+(?:\{([^}]+)\}|(\w+))\s+from\s+['"]([^'"]+)['"]/g
+  )) {
+    importPaths.add(m[3])
+    const namedImports = m[1] || m[2] || ''
+    for (const name of namedImports.split(',')) {
+      const trimmed = name
+        .trim()
+        .split(/\s+as\s+/)[0]
+        .trim()
+      if (trimmed) {
+        references.add(trimmed)
+      }
+    }
+  }
+
+  for (const m of content.matchAll(
+    /(?:extends|implements|instanceof|new|typeof)\s+(\w+)/g
+  )) {
+    references.add(m[1])
+  }
+
+  return { exports, importPaths, references }
+}
+
+/**
+ * Group files that share dependencies into clusters using Union-Find,
+ * then pack clusters into chunks of `targetSize`. Files that import from
+ * each other or reference each other's exports stay in the same chunk
+ * so the model can reason about cross-file coherence.
+ */
+function createDependencyAwareChunks(
+  files: ReadonlyArray<IFileConflictContext>,
+  targetSize: number
+): ReadonlyArray<ReadonlyArray<IFileConflictContext>> {
+  if (files.length <= targetSize) {
+    return [Array.from(files)]
+  }
+
+  const fileSymbols = files.map(f => ({
+    ...extractSymbols(f),
+    baseName: f.path.replace(/\.[^.]+$/, '').replace(/^.*\//, ''),
+  }))
+
+  // Union-Find
+  const parent = new Array<number>(files.length)
+  for (let i = 0; i < files.length; i++) {
+    parent[i] = i
+  }
+
+  function find(x: number): number {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]]
+      x = parent[x]
+    }
+    return x
+  }
+
+  function union(a: number, b: number): void {
+    const pa = find(a)
+    const pb = find(b)
+    if (pa !== pb) {
+      parent[pa] = pb
+    }
+  }
+
+  for (let i = 0; i < fileSymbols.length; i++) {
+    for (let j = i + 1; j < fileSymbols.length; j++) {
+      const a = fileSymbols[i]
+      const b = fileSymbols[j]
+
+      const aImportsB = [...a.importPaths].some(p => p.includes(b.baseName))
+      const bImportsA = [...b.importPaths].some(p => p.includes(a.baseName))
+
+      let sharedSymbols = false
+      if (!sharedSymbols) {
+        for (const exp of a.exports) {
+          if (b.references.has(exp)) {
+            sharedSymbols = true
+            break
+          }
+        }
+      }
+      if (!sharedSymbols) {
+        for (const exp of b.exports) {
+          if (a.references.has(exp)) {
+            sharedSymbols = true
+            break
+          }
+        }
+      }
+
+      if (aImportsB || bImportsA || sharedSymbols) {
+        union(i, j)
+      }
+    }
+  }
+
+  // Collect dependency groups
+  const groups = new Map<number, Array<IFileConflictContext>>()
+  for (let i = 0; i < files.length; i++) {
+    const root = find(i)
+    let group = groups.get(root)
+    if (group === undefined) {
+      group = []
+      groups.set(root, group)
+    }
+    group.push(files[i])
+  }
+
+  // Pack groups into chunks: large groups get split, small groups bin-pack
+  const result: Array<Array<IFileConflictContext>> = []
+  let currentBin: Array<IFileConflictContext> = []
+
+  for (const group of groups.values()) {
+    if (group.length >= targetSize) {
+      if (currentBin.length > 0) {
+        result.push(currentBin)
+        currentBin = []
+      }
+      for (let i = 0; i < group.length; i += targetSize) {
+        result.push(group.slice(i, i + targetSize))
+      }
+    } else {
+      if (currentBin.length + group.length > targetSize) {
+        if (currentBin.length > 0) {
+          result.push(currentBin)
+        }
+        currentBin = [...group]
+      } else {
+        currentBin.push(...group)
+      }
+    }
+  }
+
+  if (currentBin.length > 0) {
+    result.push(currentBin)
+  }
+
+  return result
 }
