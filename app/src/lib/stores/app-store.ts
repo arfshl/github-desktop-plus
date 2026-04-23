@@ -3141,6 +3141,13 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return status
   }
 
+  public async _loadStatusLight(
+    repository: Repository
+  ): Promise<IStatusResult | null> {
+    const gitStore = this.gitStoreCache.get(repository)
+    return await gitStore.loadStatusLight()
+  }
+
   /**
    * This method is to initialize a multi commit operation state on app load
    * if conflicts are found but not multi commmit operation exists.

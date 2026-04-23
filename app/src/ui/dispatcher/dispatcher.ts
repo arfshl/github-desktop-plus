@@ -414,6 +414,10 @@ export class Dispatcher {
     return this.appStore._refreshOrRecoverRepository(repository)
   }
 
+  public async loadStatusLight(repository: Repository): Promise<void> {
+    await this.appStore._loadStatusLight(repository)
+  }
+
   /**
    * Refresh the commit author of a repository. Required after changing git's
    * user name or email address.
