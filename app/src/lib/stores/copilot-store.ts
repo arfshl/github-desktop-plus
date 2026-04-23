@@ -159,6 +159,7 @@ Your job:
 3. Explain your reasoning for each resolution
 
 Resolution guidelines:
+- Make the MINIMAL changes necessary to resolve the conflict — do not refactor, reformat, or alter code outside the conflicted regions
 - When both sides add complementary code (e.g., different imports, different functions), combine them
 - When both sides modify the same code differently, use commit messages and PR context to determine the correct resolution
 - When one side deletes code the other modifies, determine if the deletion was intentional
