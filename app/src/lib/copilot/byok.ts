@@ -278,6 +278,19 @@ function isBYOKProvider(value: unknown): value is IBYOKProvider {
   ) {
     return false
   }
+  if (
+    p.wireApi !== undefined &&
+    p.wireApi !== 'completions' &&
+    p.wireApi !== 'responses'
+  ) {
+    return false
+  }
+  if (
+    p.azureApiVersion !== undefined &&
+    typeof p.azureApiVersion !== 'string'
+  ) {
+    return false
+  }
   if (!Array.isArray(p.models) || !p.models.every(isBYOKModel)) {
     return false
   }
