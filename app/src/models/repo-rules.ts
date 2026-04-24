@@ -76,16 +76,12 @@ export class RepoRulesMetadataRules {
   }
 
   /**
-   * Returns the human-readable descriptions of all rules that github.com
-   * will evaluate when the user pushes the commit. This includes rules
-   * the current user is permitted to bypass (since github.com still
-   * evaluates them) but excludes rules that are not enforced for the
-   * current user.
+   * Returns the underlying rules. Intended for callers that need to
+   * inspect or filter rules beyond the matching logic provided by
+   * `getFailedRules`.
    */
-  public getEnforcedHumanDescriptions(): ReadonlyArray<string> {
+  public getRules(): ReadonlyArray<IRepoRulesMetadataRule> {
     return this.rules
-      .filter(r => r.enforced === true || r.enforced === 'bypass')
-      .map(r => r.humanDescription)
   }
 }
 

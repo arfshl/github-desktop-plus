@@ -12,6 +12,7 @@ import {
   RepoRulesMetadataStatus,
 } from '../../src/models/repo-rules'
 import { Repository } from '../../src/models/repository'
+import { getEnforcedRuleDescriptions } from '../../src/lib/stores/copilot-store'
 
 const creationRule: IAPIRepoRule = {
   ruleset_id: 1,
@@ -335,11 +336,13 @@ describe('repo metadata rules', () => {
   })
 })
 
-describe('getEnforcedHumanDescriptions', () => {
+describe('getEnforcedRuleDescriptions', () => {
   it('returns an empty array when no rules are configured', async () => {
     const repoRulesInfo = await parseRepoRules([], rulesets, repo)
     assert.deepEqual(
-      repoRulesInfo.commitMessagePatterns.getEnforcedHumanDescriptions(),
+      getEnforcedRuleDescriptions(
+        repoRulesInfo.commitMessagePatterns.getRules()
+      ),
       []
     )
   })
@@ -352,7 +355,9 @@ describe('getEnforcedHumanDescriptions', () => {
       repo
     )
     assert.deepEqual(
-      repoRulesInfo.commitMessagePatterns.getEnforcedHumanDescriptions(),
+      getEnforcedRuleDescriptions(
+        repoRulesInfo.commitMessagePatterns.getRules()
+      ),
       ['must start with "abc"']
     )
   })
@@ -365,7 +370,9 @@ describe('getEnforcedHumanDescriptions', () => {
       repo
     )
     assert.deepEqual(
-      repoRulesInfo.commitMessagePatterns.getEnforcedHumanDescriptions(),
+      getEnforcedRuleDescriptions(
+        repoRulesInfo.commitMessagePatterns.getRules()
+      ),
       ['must start with "abc"']
     )
   })
@@ -381,7 +388,9 @@ describe('getEnforcedHumanDescriptions', () => {
       repo
     )
     assert.deepEqual(
-      repoRulesInfo.commitMessagePatterns.getEnforcedHumanDescriptions(),
+      getEnforcedRuleDescriptions(
+        repoRulesInfo.commitMessagePatterns.getRules()
+      ),
       [
         'must start with "abc"',
         'must start with "abc"',

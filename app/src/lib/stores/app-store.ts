@@ -5717,7 +5717,7 @@ export class AppStore extends TypedBaseStore<IAppState> {
               ),
               this.repositoryStateCache
                 .get(repository)
-                .changesState.currentRepoRulesInfo.commitMessagePatterns.getEnforcedHumanDescriptions()
+                .changesState.currentRepoRulesInfo.commitMessagePatterns.getRules()
             )
           : await API.fromAccount(account).getDiffChangesCommitMessage(diff)
 
