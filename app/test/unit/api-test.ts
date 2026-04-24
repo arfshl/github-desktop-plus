@@ -20,7 +20,10 @@ function assertNext(current: IPageInfo, expected: IPageInfo) {
   )
 
   const nextPath = getNextPagePathWithIncreasingPageSize(
-    new Response(null, { headers })
+    new Response(null, { headers }),
+    'per_page',
+    'page',
+    100
   )
 
   assert(nextPath !== null)
@@ -51,14 +54,24 @@ function assertNext(current: IPageInfo, expected: IPageInfo) {
 describe('API', () => {
   describe('getNextPagePathWithIncreasingPageSize', () => {
     it("returns null when there's no link header", () => {
-      assert(getNextPagePathWithIncreasingPageSize(new Response()) === null)
+      assert(
+        getNextPagePathWithIncreasingPageSize(
+          new Response(),
+          'per_page',
+          'page',
+          100
+        ) === null
+      )
     })
 
     it('returns raw link when missing page size', () => {
       const nextPath = getNextPagePathWithIncreasingPageSize(
         new Response(null, {
           headers: createHeadersWithNextLink('/items?page=2'),
-        })
+        }),
+        'per_page',
+        'page',
+        100
       )
 
       assert.equal(nextPath, '/items?page=2')
@@ -68,7 +81,10 @@ describe('API', () => {
       const nextPath = getNextPagePathWithIncreasingPageSize(
         new Response(null, {
           headers: createHeadersWithNextLink('/items?per_page=10'),
-        })
+        }),
+        'per_page',
+        'page',
+        100
       )
 
       assert.equal(nextPath, '/items?per_page=10')
@@ -78,7 +94,10 @@ describe('API', () => {
       const nextPath = getNextPagePathWithIncreasingPageSize(
         new Response(null, {
           headers: createHeadersWithNextLink('/items?per_page=10&page=2'),
-        })
+        }),
+        'per_page',
+        'page',
+        100
       )
 
       assert.equal(nextPath, '/items?per_page=10&page=2')
