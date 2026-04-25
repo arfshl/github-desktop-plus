@@ -2,7 +2,7 @@ import { getBoolean, setBoolean } from '../../lib/local-storage'
 
 export const ShowSideBySideDiffDefault = false
 const showSideBySideDiffKey = 'show-side-by-side-diff'
-export const ShowDiffMinimapDefault = true
+export const ShowDiffMinimapDefault = false
 const showDiffMinimapKey = 'show-diff-minimap'
 export const ShowWholeFileDefault = false
 const showWholeFileKey = 'show-whole-file'
