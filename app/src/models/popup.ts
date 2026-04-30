@@ -26,6 +26,7 @@ import { IAPIComment } from '../lib/api'
 import { ISecretScanResult } from '../ui/secret-scanning/push-protection-error-dialog'
 import { BypassReasonType } from '../ui/secret-scanning/bypass-push-protection-dialog'
 import { TerminalOutput, TerminalOutputListener } from '../lib/git'
+import type { IBYOKModel, IBYOKProvider } from '../lib/copilot/byok'
 
 export enum PopupType {
   RenameBranch = 'RenameBranch',
@@ -117,6 +118,9 @@ export enum PopupType {
   CantDeleteMainBranch = 'CantDeleteMainBranch',
   CantDeleteCurrentBranchUncommittedChanges = 'CantDeleteCurrentBranchUncommittedChanges',
   CantDeleteWorktreeUncommittedChanges = 'CantDeleteWorktreeUncommittedChanges',
+  EditCopilotBYOKProvider = 'EditCopilotBYOKProvider',
+  EditCopilotBYOKModel = 'EditCopilotBYOKModel',
+  ConfirmDeleteCopilotBYOKProvider = 'ConfirmDeleteCopilotBYOKProvider',
 }
 
 interface IBasePopup {
@@ -171,6 +175,20 @@ export type PopupDetail =
       selection: DiffSelection
     }
   | { type: PopupType.Preferences; initialSelectedTab?: PreferencesTab }
+  | {
+      type: PopupType.EditCopilotBYOKProvider
+      provider: IBYOKProvider | null
+    }
+  | {
+      type: PopupType.EditCopilotBYOKModel
+      model: IBYOKModel | null
+      otherModelIds: ReadonlyArray<string>
+      onSave: (model: IBYOKModel) => void
+    }
+  | {
+      type: PopupType.ConfirmDeleteCopilotBYOKProvider
+      provider: IBYOKProvider
+    }
   | {
       type: PopupType.RepositorySettings
       repository: Repository
