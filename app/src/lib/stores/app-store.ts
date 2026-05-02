@@ -1,5 +1,42 @@
 import * as Path from 'path'
 import {
+  defaultShowBranchNameInRepoListSetting,
+  ShowBranchNameInRepoListSetting,
+} from '../../models/show-branch-name-in-repo-list'
+import { TitleBarStyle } from '../../ui/lib/title-bar-style'
+import pLimit from 'p-limit'
+import {
+  IBranchNamePreset,
+  parseBranchNamePresets,
+} from '../../models/branch-preset'
+import {
+  BranchSortOrder,
+  DEFAULT_BRANCH_SORT_ORDER,
+} from '../../models/branch-sort-order'
+import {
+  CopyPathNormalization,
+  defaultCopyPathNormalization,
+} from '../../models/copy-path-normalization'
+import {
+  defaultDiffFontSize,
+  defaultDiffFontFamily,
+  DiffFontFamily,
+} from '../../models/diff-font'
+import { EditorOverride } from '../../models/editor-override'
+import { stageResolvedConflictFiles } from '../git/stage'
+import { normalizePath } from '../helpers/path'
+import {
+  getPreferredWorktreePath,
+  clearPreferredWorktreePath,
+} from '../worktree-preferences'
+import {
+  findSidebarWorktreeStateRepository,
+  getCurrentWorktreeEntryForRepository,
+  withSidebarWorktrees,
+  createSidebarStateFromStatus,
+  shouldRefreshSidebarWorktrees,
+} from './helpers/sidebar-worktrees'
+import {
   AccountsStore,
   CloningRepositoriesStore,
   CopilotStore,
@@ -39,14 +76,10 @@ import {
 } from '../../models/formatting-preferences'
 import {
   Commit,
-  CommitOneLine,
   ICommitContext,
+  CommitOneLine,
   shortenSHA,
 } from '../../models/commit'
-import {
-  DefaultCommitMessage,
-  ICommitMessage,
-} from '../../models/commit-message'
 import {
   DiffSelection,
   DiffSelectionType,
@@ -59,14 +92,6 @@ import {
   GitHubRepository,
   hasWritePermission,
 } from '../../models/github-repository'
-import { Popup, PopupType } from '../../models/popup'
-import {
-  ICheckoutProgress,
-  IFetchProgress,
-  IMultiCommitOperationProgress,
-  IRevertProgress,
-  Progress,
-} from '../../models/progress'
 import {
   defaultPullRequestSuggestedNextAction,
   PullRequest,
@@ -78,21 +103,33 @@ import {
   remoteEquals,
 } from '../../models/remote'
 import {
-  getNonForkGitHubRepository,
   ILocalRepositoryState,
-  isForkedRepositoryContributingToParent,
-  isRepositoryWithGitHubRepository,
   nameOf,
   Repository,
+  isRepositoryWithGitHubRepository,
   RepositoryWithGitHubRepository,
+  getNonForkGitHubRepository,
+  isForkedRepositoryContributingToParent,
 } from '../../models/repository'
 import {
-  AppFileStatusKind,
   CommittedFileChange,
   WorkingDirectoryFileChange,
   WorkingDirectoryStatus,
+  AppFileStatusKind,
 } from '../../models/status'
 import { TipState, tipEquals, IValidBranch } from '../../models/tip'
+import {
+  DefaultCommitMessage,
+  ICommitMessage,
+} from '../../models/commit-message'
+import {
+  Progress,
+  ICheckoutProgress,
+  IFetchProgress,
+  IRevertProgress,
+  IMultiCommitOperationProgress,
+} from '../../models/progress'
+import { Popup, PopupType } from '../../models/popup'
 import { themeChangeMonitor } from '../../ui/lib/theme-change-monitor'
 import { getAppPath } from '../../ui/lib/app-proxy'
 import {
@@ -102,58 +139,57 @@ import {
   getPersistedThemeName,
   setPersistedTheme,
 } from '../../ui/lib/application-theme'
-import { TitleBarStyle } from '../../ui/lib/title-bar-style'
 import {
   getAppMenu,
   getCurrentWindowState,
   getCurrentWindowZoomFactor,
-  getMainProcessConfig,
-  onShowInstallingUpdate,
-  quitApp,
-  updateMainProcessConfig,
-  sendCancelQuittingSync,
-  sendWillQuitEvenIfUpdatingSync,
-  setWindowZoomFactor,
-  updateAccounts,
   updatePreferredAppMenuItemLabels,
+  updateAccounts,
+  setWindowZoomFactor,
+  onShowInstallingUpdate,
+  sendWillQuitEvenIfUpdatingSync,
+  quitApp,
+  sendCancelQuittingSync,
+  getMainProcessConfig,
+  updateMainProcessConfig,
 } from '../../ui/main-process-proxy'
 import {
   API,
-  deleteToken,
   getAccountForEndpoint,
-  getEndpointForRepository,
-  IAPIComment,
-  IAPICreatePushProtectionBypassResponse,
-  IAPIFullRepository,
   IAPIOrganization,
+  getEndpointForRepository,
+  IAPIFullRepository,
+  IAPIComment,
   IAPIRepoRuleset,
+  deleteToken,
+  IAPICreatePushProtectionBypassResponse,
 } from '../api'
 import { shell } from '../app-shell'
 import {
-  ChangesSelectionKind,
-  ChangesWorkingDirectorySelection,
   CompareAction,
+  HistoryTabMode,
   Foldout,
   FoldoutType,
-  HistoryTabMode,
   IAppState,
-  IChangesState,
   ICompareBranch,
   ICompareFormUpdate,
-  ICompareState,
   ICompareToBranch,
-  IConstrainedValue,
   IDisplayHistory,
-  IFileListFilterState,
-  IMultiCommitOperationState,
-  IRepositoryState,
-  isCherryPickConflictState,
-  isMergeConflictState,
-  isRebaseConflictState,
   PossibleSelections,
   RepositorySectionTab,
   SelectionType,
+  IRepositoryState,
+  ChangesSelectionKind,
+  ChangesWorkingDirectorySelection,
+  isRebaseConflictState,
+  isCherryPickConflictState,
+  IFileListFilterState,
+  isMergeConflictState,
+  IMultiCommitOperationState,
+  IConstrainedValue,
+  ICompareState,
   CommitOptions,
+  IChangesState,
 } from '../app-state'
 import type { ModelInfo } from '@github/copilot-sdk'
 import {
@@ -165,98 +201,6 @@ import {
 } from '../editors'
 import { assertNever, fatalError, forceUnwrap } from '../fatal-error'
 
-import { GitError as DugiteError } from 'dugite'
-import { parseRemote } from '../../lib/remote-parsing'
-import { Banner, BannerType } from '../../models/banner'
-import {
-  IBranchNamePreset,
-  parseBranchNamePresets,
-} from '../../models/branch-preset'
-import { ComputedAction } from '../../models/computed-action'
-import { DragElement } from '../../models/drag-drop'
-import { EditorOverride } from '../../models/editor-override'
-import { ILastThankYou } from '../../models/last-thank-you'
-import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
-import { MenuLabelsEvent } from '../../models/menu-labels'
-import { MergeTreeResult } from '../../models/merge'
-import {
-  MultiCommitOperationDetail,
-  MultiCommitOperationKind,
-  MultiCommitOperationStep,
-  MultiCommitOperationStepKind,
-} from '../../models/multi-commit-operation'
-import { RepoRulesInfo } from '../../models/repo-rules'
-import { RetryAction, RetryActionType } from '../../models/retry-actions'
-import { IStashEntry, StashedChangesLoadStates } from '../../models/stash-entry'
-import {
-  isValidTutorialStep,
-  orderedTutorialSteps,
-  TutorialStep,
-} from '../../models/tutorial-step'
-import {
-  defaultUncommittedChangesStrategy,
-  UncommittedChangesStrategy,
-} from '../../models/uncommitted-changes-strategy'
-import {
-  defaultShowBranchNameInRepoListSetting,
-  ShowBranchNameInRepoListSetting,
-} from '../../models/show-branch-name-in-repo-list'
-import {
-  CopyPathNormalization,
-  defaultCopyPathNormalization,
-} from '../../models/copy-path-normalization'
-import {
-  BranchSortOrder,
-  DEFAULT_BRANCH_SORT_ORDER,
-} from '../../models/branch-sort-order'
-import {
-  defaultDiffFontFamily,
-  defaultDiffFontSize,
-  DiffFontFamily,
-} from '../../models/diff-font'
-import { WorkflowPreferences } from '../../models/workflow-preferences'
-import { TrashNameLabel } from '../../ui/lib/context-menu'
-import { getDefaultDir } from '../../ui/lib/default-dir'
-import {
-  getShowDiffMinimap,
-  getShowSideBySideDiff,
-  setShowDiffMinimap,
-  setShowSideBySideDiff,
-  ShowDiffMinimapDefault,
-  ShowSideBySideDiffDefault,
-} from '../../ui/lib/diff-mode'
-import { pathExists } from '../../ui/lib/path-exists'
-import { updateStore } from '../../ui/lib/update-store'
-import {
-  getPreferredWorktreePath,
-  clearPreferredWorktreePath,
-} from '../worktree-preferences'
-import { normalizePath } from '../helpers/path'
-import { resizableComponentClass } from '../../ui/resizable'
-import { BypassReasonType } from '../../ui/secret-scanning/bypass-push-protection-dialog'
-import { findContributionTargetDefaultBranch } from '../branch'
-import { IRefCheck } from '../ci-checks/ci-checks'
-import { clamp } from '../clamp'
-import { compare } from '../compare'
-import {
-  ICustomIntegration,
-  migratedCustomIntegration,
-} from '../custom-integration'
-import { ExternalEditorError, suggestedExternalEditor } from '../editors/shared'
-import { isAttributableEmailFor } from '../email'
-import { Emoji } from '../emoji'
-import { EndpointToken } from '../endpoint-token'
-import { arrayEquals } from '../equality'
-import {
-  CheckoutError,
-  DiscardChangesError,
-  ErrorWithMetadata,
-  StashChangesError,
-} from '../error-with-metadata'
-import {
-  enableCopilotSdkCommitMessageGeneration,
-  enableCustomIntegration,
-} from '../feature-flag'
 import { formatCommitMessage } from '../format-commit-message'
 import {
   getAccountForCommitMessageGeneration,
@@ -264,120 +208,76 @@ import {
 } from '../get-account-for-repository'
 import {
   abortMerge,
-  abortRebase,
   addRemote,
-  appendIgnoreFile,
-  appendIgnoreRule,
   checkoutBranch,
-  checkoutCommit,
-  continueRebase,
   createCommit,
+  getAuthorIdentity,
+  getChangedFiles,
+  getCommitDiff,
+  getMergeBase,
+  getRemotes,
+  getWorkingDirectoryDiff,
+  isCoAuthoredByTrailer,
+  pull as pullRepo,
+  push as pushRepo,
+  renameBranch,
+  saveGitIgnore,
+  appendIgnoreRule,
   createMergeCommit,
+  getBranchesPointedAt,
+  abortRebase,
+  continueRebase,
+  rebase,
+  PushOptions,
+  RebaseResult,
+  getRebaseSnapshot,
+  IStatusResult,
+  GitError,
+  MergeResult,
+  getBranchesDifferingFromUpstream,
   deleteLocalBranch,
   deleteRemoteBranch,
   fastForwardBranches,
-  getAuthorIdentity,
+  GitResetMode,
+  reset,
   getBranchAheadBehind,
-  getBranchesDifferingFromUpstream,
-  getBranchesPointedAt,
+  getRebaseInternalState,
+  getCommit,
+  appendIgnoreFile,
+  getRepositoryType,
+  RepositoryType,
+  getCommitRangeDiff,
+  getCommitRangeChangedFiles,
+  updateRemoteHEAD,
   getBranchMergeBaseChangedFiles,
   getBranchMergeBaseDiff,
-  getChangedFiles,
-  getCommit,
-  getCommitDiff,
-  getCommitRangeChangedFiles,
-  getCommitRangeDiff,
-  getFilesDiffText,
-  getGlobalConfigPath,
-  getMergeBase,
-  getRebaseInternalState,
-  getRebaseSnapshot,
-  getRemotes,
+  checkoutCommit,
   getRemoteURL,
-  getRepositoryType,
-  getWorkingDirectoryDiff,
-  GitError,
-  GitResetMode,
-  isCoAuthoredByTrailer,
-  IStatusResult,
-  MergeResult,
-  pull as pullRepo,
-  PushOptions,
-  push as pushRepo,
-  rebase,
-  RebaseResult,
-  renameBranch,
-  RepositoryType,
-  reset,
-  saveGitIgnore,
-  unstageAll,
-  updateRemoteHEAD,
+  getGlobalConfigPath,
+  getFilesDiffText,
   TerminalOutput,
   HookProgress,
+  getConfigValueWithOrigin,
+  IConfigValueOrigin,
+  listWorktrees,
+  unstageAll,
 } from '../git'
-import { GitErrorContext } from '../git-error-context'
-import {
-  abortCherryPick,
-  cherryPick,
-  CherryPickResult,
-  continueCherryPick,
-  getCherryPickSnapshot,
-  isCherryPickHeadFound,
-} from '../git/cherry-pick'
 import {
   installGlobalLFSFilters,
   installLFSHooks,
   isUsingLFS,
 } from '../git/lfs'
-import { getConfigValueWithOrigin, IConfigValueOrigin } from '../git/config'
-import { determineMergeability } from '../git/merge-tree'
-import { listWorktrees } from '../git/worktree'
-import { reorder } from '../git/reorder'
-import { squash } from '../git/squash'
-import { stageResolvedConflictFiles } from '../git/stage'
-import {
-  createDesktopStashEntry,
-  dropDesktopStashEntry,
-  getLastDesktopStashEntryForBranch,
-  moveStashEntry,
-  popStashEntry,
-} from '../git/stash'
-import { sendNonFatalException } from '../helpers/non-fatal-exception'
-import {
-  findAssociatedPullRequest,
-  isPullRequestAssociatedWithBranch,
-} from '../helpers/pull-request-matching'
-import { isBranchPushable } from '../helpers/push-control'
-import { parseRepoRules, useRepoRulesLogic } from '../helpers/repo-rules'
 import { inferLastPushForRepository } from '../infer-last-push-for-repository'
-import * as ipcRenderer from '../ipc-renderer'
-import {
-  getBoolean,
-  getEnum,
-  getFloatNumber,
-  getNumber,
-  getNumberArray,
-  getObject,
-  setBoolean,
-  setNumber,
-  setNumberArray,
-  setObject,
-} from '../local-storage'
 import { updateMenuState } from '../menu-update'
 import { merge } from '../merge'
-import { isConflictsFlow } from '../multi-commit-operation'
-import { offsetFromNow } from '../offset-from'
-import { IOAuthAction } from '../parse-app-url'
-import { PopupManager } from '../popup-manager'
-import { promiseWithMinimumTimeout } from '../promise'
-import { readEmoji } from '../read-emoji'
-import { ForcePushBranchState, getCurrentBranchForcePushState } from '../rebase'
 import {
   IMatchedGitHubRepository,
-  matchExistingRepository,
   matchGitHubRepository,
+  matchExistingRepository,
   urlMatchesRemote,
 } from '../repository-matching'
+import { ForcePushBranchState, getCurrentBranchForcePushState } from '../rebase'
+import { RetryAction, RetryActionType } from '../../models/retry-actions'
 import {
   Default as DefaultShell,
   findShellOrDefault,
@@ -386,47 +286,148 @@ import {
   parse as parseShell,
   Shell,
 } from '../shells'
-import { UseWindowsOpenSSHKey } from '../ssh/ssh'
 import { ILaunchStats, StatsStore } from '../stats'
+import { hasShownWelcomeFlow, markWelcomeFlowComplete } from '../welcome'
+import { WindowState } from '../window-state'
+import { TypedBaseStore } from './base-store'
+import { MergeTreeResult } from '../../models/merge'
+import { promiseWithMinimumTimeout } from '../promise'
+import { BackgroundFetcher } from './helpers/background-fetcher'
+import { RepositoryStateCache } from './repository-state-cache'
+import { readEmoji } from '../read-emoji'
+import { Emoji } from '../emoji'
+import { GitStoreCache } from './git-store-cache'
+import { GitErrorContext } from '../git-error-context'
+import {
+  setNumber,
+  setBoolean,
+  getBoolean,
+  getNumber,
+  getNumberArray,
+  setNumberArray,
+  getEnum,
+  getObject,
+  setObject,
+  getFloatNumber,
+} from '../local-storage'
+import { ExternalEditorError, suggestedExternalEditor } from '../editors/shared'
+import { ApiRepositoriesStore } from './api-repositories-store'
+import {
+  updateChangedFiles,
+  updateConflictState,
+  selectWorkingDirectoryFiles,
+} from './updates/changes-state'
+import { ManualConflictResolution } from '../../models/manual-conflict-resolution'
+import { BranchPruner } from './helpers/branch-pruner'
+import {
+  enableCopilotSdkCommitMessageGeneration,
+  enableCustomIntegration,
+} from '../feature-flag'
+import { Banner, BannerType } from '../../models/banner'
+import { ComputedAction } from '../../models/computed-action'
+import {
+  createDesktopStashEntry,
+  getLastDesktopStashEntryForBranch,
+  popStashEntry,
+  dropDesktopStashEntry,
+  moveStashEntry,
+} from '../git/stash'
+import {
+  UncommittedChangesStrategy,
+  defaultUncommittedChangesStrategy,
+} from '../../models/uncommitted-changes-strategy'
+import { IStashEntry, StashedChangesLoadStates } from '../../models/stash-entry'
+import { arrayEquals } from '../equality'
+import { MenuLabelsEvent } from '../../models/menu-labels'
+import { findRemoteBranchName } from './helpers/find-branch-name'
+import { updateRemoteUrl } from './updates/update-remote-url'
+import {
+  TutorialStep,
+  orderedTutorialSteps,
+  isValidTutorialStep,
+} from '../../models/tutorial-step'
+import { OnboardingTutorialAssessor } from './helpers/tutorial-assessor'
 import { getUntrackedFiles } from '../status'
+import { isBranchPushable } from '../helpers/push-control'
+import {
+  findAssociatedPullRequest,
+  isPullRequestAssociatedWithBranch,
+} from '../helpers/pull-request-matching'
+import { parseRemote } from '../../lib/remote-parsing'
+import { createTutorialRepository } from './helpers/create-tutorial-repository'
+import { sendNonFatalException } from '../helpers/non-fatal-exception'
+import { getDefaultDir } from '../../ui/lib/default-dir'
+import { WorkflowPreferences } from '../../models/workflow-preferences'
+import { RepositoryIndicatorUpdater } from './helpers/repository-indicator-updater'
+import { isAttributableEmailFor } from '../email'
+import { TrashNameLabel } from '../../ui/lib/context-menu'
+import { GitError as DugiteError } from 'dugite'
+import {
+  ErrorWithMetadata,
+  CheckoutError,
+  DiscardChangesError,
+  StashChangesError,
+} from '../error-with-metadata'
+import {
+  ShowDiffMinimapDefault,
+  ShowSideBySideDiffDefault,
+  getShowDiffMinimap,
+  getShowSideBySideDiff,
+  setShowDiffMinimap,
+  setShowSideBySideDiff,
+} from '../../ui/lib/diff-mode'
+import {
+  abortCherryPick,
+  cherryPick,
+  CherryPickResult,
+  continueCherryPick,
+  getCherryPickSnapshot,
+  isCherryPickHeadFound,
+} from '../git/cherry-pick'
+import { DragElement } from '../../models/drag-drop'
+import { ILastThankYou } from '../../models/last-thank-you'
+import { squash } from '../git/squash'
 import { getTipSha } from '../tip'
+import {
+  MultiCommitOperationDetail,
+  MultiCommitOperationKind,
+  MultiCommitOperationStep,
+  MultiCommitOperationStepKind,
+} from '../../models/multi-commit-operation'
+import { reorder } from '../git/reorder'
+import { UseWindowsOpenSSHKey } from '../ssh/ssh'
+import { isConflictsFlow } from '../multi-commit-operation'
+import { clamp } from '../clamp'
+import { EndpointToken } from '../endpoint-token'
+import { IRefCheck } from '../ci-checks/ci-checks'
+import {
+  NotificationsStore,
+  getNotificationsEnabled,
+} from './notifications-store'
+import * as ipcRenderer from '../ipc-renderer'
+import { pathExists } from '../../ui/lib/path-exists'
+import { offsetFromNow } from '../offset-from'
+import { findContributionTargetDefaultBranch } from '../branch'
+import { ValidNotificationPullRequestReview } from '../valid-notification-pull-request-review'
+import { determineMergeability } from '../git/merge-tree'
+import { PopupManager } from '../popup-manager'
+import { resizableComponentClass } from '../../ui/resizable'
+import { compare } from '../compare'
+import { parseRepoRules, useRepoRulesLogic } from '../helpers/repo-rules'
+import { RepoRulesInfo } from '../../models/repo-rules'
 import {
   setUseExternalCredentialHelper,
   useExternalCredentialHelper,
   useExternalCredentialHelperDefault,
 } from '../trampoline/use-external-credential-helper'
-import { ValidNotificationPullRequestReview } from '../valid-notification-pull-request-review'
-import { hasShownWelcomeFlow, markWelcomeFlowComplete } from '../welcome'
-import { WindowState } from '../window-state'
-import { ApiRepositoriesStore } from './api-repositories-store'
-import { TypedBaseStore } from './base-store'
-import { GitStoreCache } from './git-store-cache'
-import { BackgroundFetcher } from './helpers/background-fetcher'
-import { BranchPruner } from './helpers/branch-pruner'
-import { createTutorialRepository } from './helpers/create-tutorial-repository'
-import { findRemoteBranchName } from './helpers/find-branch-name'
-import { RepositoryIndicatorUpdater } from './helpers/repository-indicator-updater'
+import { IOAuthAction } from '../parse-app-url'
 import {
-  createSidebarStateFromStatus,
-  findSidebarWorktreeStateRepository,
-  getCurrentWorktreeEntryForRepository,
-  shouldRefreshSidebarWorktrees,
-  withSidebarWorktrees,
-} from './helpers/sidebar-worktrees'
-import { OnboardingTutorialAssessor } from './helpers/tutorial-assessor'
-import {
-  getNotificationsEnabled,
-  NotificationsStore,
-} from './notifications-store'
-import { RepositoryStateCache } from './repository-state-cache'
-import {
-  selectWorkingDirectoryFiles,
-  updateChangedFiles,
-  updateConflictState,
-} from './updates/changes-state'
-import { updateRemoteUrl } from './updates/update-remote-url'
+  ICustomIntegration,
+  migratedCustomIntegration,
+} from '../custom-integration'
+import { updateStore } from '../../ui/lib/update-store'
+import { BypassReasonType } from '../../ui/secret-scanning/bypass-push-protection-dialog'
 import { getRepoHooks } from '../hooks/get-repo-hooks'
-import pLimit from 'p-limit'
 
 const LastSelectedRepositoryIDKey = 'last-selected-repository-id'
 
