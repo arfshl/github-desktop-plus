@@ -48,11 +48,14 @@ export class CopilotConflictsDialog extends React.Component<
   private onBackToManual = () => {
     const { dispatcher, repository, conflictState } = this.props
 
-    dispatcher.setCopilotConflictResolution(repository, false)
-    dispatcher.setMultiCommitOperationStep(repository, {
-      kind: MultiCommitOperationStepKind.ShowConflicts,
-      conflictState,
-    })
+    dispatcher.setMultiCommitOperationStepWithCopilotResolution(
+      repository,
+      {
+        kind: MultiCommitOperationStepKind.ShowConflicts,
+        conflictState,
+      },
+      false
+    )
   }
 
   private onContinue = async () => {
