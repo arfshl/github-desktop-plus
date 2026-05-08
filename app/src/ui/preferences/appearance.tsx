@@ -332,6 +332,9 @@ export class Appearance extends React.Component<
   }
 
   private renderTitleBarStyleDropdown() {
+    if (!__LINUX__) {
+      return null
+    }
     const { titleBarStyle } = this.state
     const titleBarStyleDescription = getTitleBarStyleDescription(titleBarStyle)
 

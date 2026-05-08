@@ -1501,7 +1501,7 @@ export class App extends React.Component<IAppProps, IAppState> {
 
     // We do not render the app menu bar on Linux when the user has selected
     // the "native" menu option
-    if (__LINUX__ && this.state.titleBarStyle === 'native') {
+    if (__LINUX__ && this.state.titleBarStyle !== 'custom') {
       return null
     }
 

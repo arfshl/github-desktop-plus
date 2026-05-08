@@ -6,8 +6,8 @@ Upstream: [GitHub Desktop 3.5.9-beta2 release notes](https://github.com/desktop/
 
 ## **Changes and improvements:**
 
-- [#151] Added the option to auto-hide the menu bar on Windows and Linux.  
-  To enable this option, [TODO]
+- [#151] **Linux:** Added the option to auto-hide the menu bar.  
+  Go to `File` > `Options` > `Appearance` > `Title bar style` and select "Native without menu bar".
 
 - [#149] Allow pinning repositories to the top of the repo list.  
   To pin a repository, right-click on it in the list and select "Pin to top".
