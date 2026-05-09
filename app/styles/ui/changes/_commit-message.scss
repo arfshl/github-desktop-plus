@@ -191,7 +191,7 @@
   .copilot-button {
     color: var(--text-secondary-color);
 
-    &:hover {
+    &:not([aria-disabled='true']):hover {
       color: var(--text-color);
     }
 
@@ -206,12 +206,12 @@
 
   .co-authors-toggle,
   .commit-options-button {
-    color: var(--text-color);
+    color: var(--text-secondary-color);
 
     &.default-options {
       color: var(--text-secondary-color);
     }
-    &:hover {
+    &:not([aria-disabled='true']):hover {
       color: var(--text-color);
     }
 
