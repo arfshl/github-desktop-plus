@@ -11,19 +11,20 @@ export async function getWorktreeCheckedOutBranches(
   repository: Repository
 ): Promise<ReadonlySet<string>> {
   const result = await git(
-    ['worktree', 'list', '--porcelain'],
+    ['worktree', 'list', '--porcelain', '-z'],
     repository.path,
     'getWorktreeCheckedOutBranches'
   )
 
   const branches = new Set<string>()
 
-  // Porcelain output: blocks separated by blank lines.
+  // With -z, lines are NUL-terminated and blocks are separated by
+  // double NUL (i.e. an empty string between two NUL terminators).
   // First block is always the main worktree — skip it.
-  const blocks = result.stdout.split('\n\n').slice(1)
+  const blocks = result.stdout.split('\0\0').slice(1)
 
   for (const block of blocks) {
-    for (const line of block.split('\n')) {
+    for (const line of block.split('\0')) {
       if (line.startsWith('branch ')) {
         branches.add(line.substring('branch '.length))
       }
