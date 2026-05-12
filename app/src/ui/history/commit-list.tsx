@@ -37,6 +37,13 @@ import * as octicons from '../octicons/octicons.generated'
 
 const RowHeight = 50
 
+export interface ICommitListItemRenderProps {
+  readonly row: number
+  readonly commit: Commit
+  readonly showUnpushedIndicator: boolean
+  readonly unpushedIndicatorTitle?: string
+}
+
 interface ICommitListProps {
   /** The Repository associated with this commit (if found) */
   readonly repository: Repository | null
@@ -204,6 +211,23 @@ interface ICommitListProps {
 
   /** This will make the list semantics friendly to screen reader users in browse mode. */
   readonly isInformationalView?: boolean
+
+  /** Optional fixed row height override for the commitGraph renderer. */
+  readonly commitGraphRowHeight?: number
+
+  /** Optional class name for list-specific styling. */
+  readonly className?: string
+
+  /** Optional custom renderer for commit rows. */
+  readonly renderCommitItem?: (
+    props: ICommitListItemRenderProps
+  ) => JSX.Element | null
+
+  /** Extra invalidation data for custom commit row renderers. */
+  readonly additionalInvalidationProps?: unknown
+
+  /** Whether to suppress the default row focus tooltip. */
+  readonly disableRowFocusTooltip?: boolean
 }
 
 interface ICommitListState {
@@ -308,6 +332,17 @@ export class CommitList extends React.Component<
     const showUnpushedIndicator =
       (isLocal || unpushedTags.length > 0) &&
       this.props.isLocalRepository === false
+    if (this.props.renderCommitItem !== undefined) {
+      return this.props.renderCommitItem({
+        row,
+        commit,
+        showUnpushedIndicator,
+        unpushedIndicatorTitle: this.getUnpushedIndicatorTitle(
+          isLocal,
+          unpushedTags.length
+        ),
+      })
+    }
 
     return (
       <CommitListItem
@@ -477,6 +512,19 @@ export class CommitList extends React.Component<
   }
 
   private onScroll = (scrollTop: number, clientHeight: number) => {
+    const commitGraphRowHeight = this.props.commitGraphRowHeight
+
+    if (commitGraphRowHeight !== undefined) {
+      const numberOfRows = Math.ceil(clientHeight / commitGraphRowHeight)
+      const top = Math.floor(scrollTop / commitGraphRowHeight)
+      const bottom = top + numberOfRows
+      this.props.onScroll?.(top, bottom)
+
+      // Pass new scroll value so the scroll position will be remembered (if the callback has been supplied).
+      this.props.onCompareListScrolled?.(scrollTop)
+      return
+    }
+
     const numberOfRows = Math.ceil(clientHeight / RowHeight)
     const top = Math.floor(scrollTop / RowHeight)
     const bottom = top + numberOfRows
@@ -624,10 +672,13 @@ export class CommitList extends React.Component<
       )
     }
 
-    const classes = classNames({
-      'has-highlighted-commits':
-        shasToHighlight !== undefined && shasToHighlight.length > 0,
-    })
+    const classes = classNames(
+      {
+        'has-highlighted-commits':
+          shasToHighlight !== undefined && shasToHighlight.length > 0,
+      },
+      this.props.className
+    )
 
     const selectedRows = selectedSHAs
       .map(sha => this.rowForSHA(sha))
@@ -641,7 +692,7 @@ export class CommitList extends React.Component<
           role={this.props.isInformationalView === true ? 'list' : 'listbox'}
           ref={this.listRef}
           rowCount={commitSHAs.length}
-          rowHeight={RowHeight}
+          rowHeight={this.props.commitGraphRowHeight ?? RowHeight}
           selectedRows={selectedRows}
           rowRenderer={this.renderCommit}
           onDropDataInsertion={this.onDropDataInsertion}
@@ -671,10 +722,15 @@ export class CommitList extends React.Component<
             tagsToPush: this.props.tagsToPush,
             shasToHighlight: this.props.shasToHighlight,
             preferAbsoluteDates: this.props.preferAbsoluteDates,
+            additionalInvalidationProps: this.props.additionalInvalidationProps,
           }}
           setScrollTop={this.props.compareListScrollTop}
           rowCustomClassNameMap={this.getRowCustomClassMap()}
-          renderRowFocusTooltip={this.renderRowFocusTooltip}
+          renderRowFocusTooltip={
+            this.props.disableRowFocusTooltip === true
+              ? undefined
+              : this.renderRowFocusTooltip
+          }
         />
         <AriaLiveContainer message={this.state.reorderingMessage} />
       </div>
