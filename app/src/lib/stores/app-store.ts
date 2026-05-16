@@ -305,7 +305,6 @@ import {
   commitGraph_BranchListWidthConfigKey,
   commitGraph_setStoredCollapsedBranchGroups,
   commitGraph_setStoredHiddenBranchRefs,
-  commitGraph_setStoredViewMode,
 } from './commit-graph-state'
 import { readEmoji } from '../read-emoji'
 import { Emoji } from '../emoji'
@@ -2529,14 +2528,6 @@ export class AppStore extends TypedBaseStore<IAppState> {
           }
         }
       }
-    }
-
-    if (
-      previouslySelectedRepository instanceof Repository &&
-      previouslySelectedRepository.hash !== repository.hash
-    ) {
-      // Keep the graph/tree choice from carrying across repositories.
-      commitGraph_setStoredViewMode('list')
     }
 
     this.emitUpdate()
