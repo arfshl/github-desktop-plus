@@ -99,6 +99,7 @@ const imageFileExtensions = new Set([
   '.webp',
   '.bmp',
   '.avif',
+  '.svg',
 ])
 
 if (enableImagePreviewsForDDSFiles()) {
@@ -542,6 +543,30 @@ export async function convertDiff(
 ): Promise<IDiff> {
   const extension = Path.extname(file.path).toLowerCase()
 
+  // SVG files are text-based but can also be rendered as images. Return an
+  // image diff that also includes the text diff so the viewer can show both.
+  if (extension === '.svg') {
+    const imageDiff = await getImageDiff(
+      repository,
+      file,
+      newestCommitish,
+      oldestCommitish
+    )
+    if (!diff.isBinary) {
+      return {
+        ...imageDiff,
+        textDiff: {
+          text: diff.contents,
+          hunks: diff.hunks,
+          lineEndingsChange,
+          maxLineNumber: diff.maxLineNumber,
+          hasHiddenBidiChars: diff.hasHiddenBidiChars,
+        },
+      }
+    }
+    return imageDiff
+  }
+
   if (diff.isBinary) {
     // some extension we don't know how to parse, never mind
     if (!imageFileExtensions.has(extension)) {
@@ -587,6 +612,9 @@ function getMediaType(extension: string) {
   }
   if (extension === '.avif') {
     return 'image/avif'
+  }
+  if (extension === '.svg') {
+    return 'image/svg+xml'
   }
   if (extension === '.dds') {
     return 'image/vnd-ms.dds'

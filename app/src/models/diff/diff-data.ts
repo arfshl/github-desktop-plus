@@ -82,6 +82,12 @@ export interface IImageDiff {
    * Will be undefined for a deleted image
    */
   readonly current?: Image
+
+  /**
+   * Text diff data for SVG files, which are text-based but renderable as images.
+   * When present, a "Code" tab is shown as the first and default view mode.
+   */
+  readonly textDiff?: ITextDiffData
 }
 
 export interface IBinaryDiff {

@@ -452,6 +452,29 @@
   padding: 0;
 }
 // ***************************************************************************************************************************
+.panel.svg-diff-container {
+  flex-direction: column;
+  padding: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel.svg-diff-container,
+.panel.image.svg-image {
+  .tab-bar {
+    width: 437px;
+    margin: var(--spacing) auto;
+    flex-shrink: 0;
+  }
+}
+
+.panel.svg-diff-container.svg-2tab,
+.panel.image.svg-image.svg-2tab {
+  .tab-bar {
+    width: 200px;
+  }
+}
+
 .panel.image {
   display: flex;
   flex: 1;

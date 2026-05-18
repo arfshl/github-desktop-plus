@@ -18,6 +18,12 @@ interface IModifiedImageDiffProps {
    * to change the diff presentation mode.
    */
   readonly onChangeDiffType: (type: ImageDiffType) => void
+  /**
+   * If provided, a "Code" tab is shown as the first option and renders this
+   * content. Used for SVG files, which are text-based but also renderable as
+   * images. The Code tab is selected by default when this prop is present.
+   */
+  readonly renderCodeDiff?: () => React.ReactNode
 }
 
 export interface ICommonImageDiffProperties {
@@ -53,6 +59,9 @@ interface IModifiedImageDiffState {
 
   /** The size of the container element. */
   readonly containerSize: ISize | null
+
+  /** Whether the code (text) view is active. Only applicable when renderCodeDiff is provided. */
+  readonly showCode: boolean
 }
 
 /** A component which renders the changes to an image in the repository */
@@ -91,6 +100,7 @@ export class ModifiedImageDiff extends React.Component<
       previousImageSize: null,
       currentImageSize: null,
       containerSize: null,
+      showCode: props.renderCodeDiff !== undefined,
     }
   }
 
@@ -145,7 +155,60 @@ export class ModifiedImageDiff extends React.Component<
     }
   }
 
+  public componentDidUpdate(prevProps: IModifiedImageDiffProps) {
+    // When switching from a non-SVG to an SVG, default to the Code tab.
+    if (!prevProps.renderCodeDiff && this.props.renderCodeDiff) {
+      this.setState({ showCode: true })
+    }
+  }
+
   public render() {
+    return this.props.renderCodeDiff
+      ? this.renderCodeDiff()
+      : this.renderImageDiff()
+  }
+
+  private renderCodeDiff() {
+    const { showCode } = this.state
+
+    if (showCode) {
+      return (
+        <div className="panel svg-diff-container">
+          <TabBar
+            selectedIndex={0}
+            onTabClicked={this.onSvgTabClicked}
+            type={TabBarType.Switch}
+          >
+            <span>Code</span>
+            <span>2-up</span>
+            <span>Swipe</span>
+            <span>Onion Skin</span>
+            <span>Difference</span>
+          </TabBar>
+          {this.props.renderCodeDiff!()}
+        </div>
+      )
+    }
+
+    return (
+      <div className="panel image svg-image" id="diff">
+        <TabBar
+          selectedIndex={1 + this.props.diffType}
+          onTabClicked={this.onSvgTabClicked}
+          type={TabBarType.Switch}
+        >
+          <span>Code</span>
+          <span>2-up</span>
+          <span>Swipe</span>
+          <span>Onion Skin</span>
+          <span>Difference</span>
+        </TabBar>
+        {this.renderCurrentDiffType()}
+      </div>
+    )
+  }
+
+  private renderImageDiff() {
     return (
       <div className="panel image" id="diff">
         <TabBar
@@ -162,6 +225,15 @@ export class ModifiedImageDiff extends React.Component<
         {this.renderCurrentDiffType()}
       </div>
     )
+  }
+
+  private onSvgTabClicked = (index: number) => {
+    if (index === 0) {
+      this.setState({ showCode: true })
+    } else {
+      this.setState({ showCode: false })
+      this.props.onChangeDiffType((index - 1) as ImageDiffType)
+    }
   }
 
   private renderCurrentDiffType() {
